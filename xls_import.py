@@ -35,6 +35,7 @@ class XLSImporter(object):
         parser.add_option("-p", "--db-password", dest="db_password", help="MySQL password")
         parser.add_option("-d", "--db-database", dest="db_database", help="MySQL database")
         parser.add_option("-b", "--db-table", dest="db_table", help="MySQL table")
+        parser.add_option("-i", "--sheet", dest="sheet", help="index of the Excel sheet (default: 0)")
         parser.add_option("-x", "--update-if-exists", action="store", dest="update_mode",
             help="column name that will be used to detect and update a row in MySQL if it already exists")
         parser.add_option("-k", "--keep-if-exists", action="store", dest="keep_mode",
@@ -50,6 +51,9 @@ class XLSImporter(object):
 
         if not self.options.db_password:
             self.options.db_password = ''
+
+        if not self.options.sheet:
+            self.options.sheet = 0
 
     def message(self, m, message_type=None):
         if not self.options.quiet_mode:
@@ -95,8 +99,19 @@ class XLSImporter(object):
         # process files
         for file in self.args:
             self.message("opening: %s" % file)
-            xls = open_workbook(file)
-            sheet = xls.sheet_by_index(0)
+
+            try:
+                xls = open_workbook(file)
+            except IOError:
+                self.message("no such file: %s" % file, "error")
+                exit(1)
+
+            try:
+                sheet = xls.sheet_by_index(int(self.options.sheet))
+            except IndexError:
+                self.message("sorry, this sheet is out of range: %s" % int(self.options.sheet), "error")
+                exit(1)
+
             self.message("rows in sheet: %s" % sheet.nrows)
 
             columns = []
@@ -115,11 +130,11 @@ class XLSImporter(object):
                         values.append(sheet.cell(row_index, col_index).value)
 
                         # check if a row already exists
-                        if self.options.keep_mode == columns[col_index] \
-                            or self.options.update_mode == columns[col_index]:
+                        if self.options.keep_mode == columns[col_index]\
+                        or self.options.update_mode == columns[col_index]:
 
                             query = "SELECT %s FROM %s WHERE %s = %%s" % (
-                            columns[col_index], self.options.db_table, columns[col_index])
+                                columns[col_index], self.options.db_table, columns[col_index])
                             self.message("%s" % (query % sheet.cell(row_index, col_index).value), "sql")
                             cursor.execute(query, sheet.cell(row_index, col_index).value)
                             needs_update = sheet.cell(row_index, col_index).value if cursor.rowcount else False
