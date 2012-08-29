@@ -89,11 +89,15 @@ class XLSImporter(object):
         # check that a table exists
         query = "SHOW TABLES LIKE %s"
         self.message("%s" % (query % self.options.db_table), "sql")
-        cursor.execute(query, self.options.db_table)
+
+        try:
+            cursor.execute(query, self.options.db_table)
+        except MySQLdb.Error, e:
+            self.message("MySQL error (%d): %s" % (e.args[0], e.args[1]), "error")
+            exit(1)
+
         if not cursor.rowcount:
             self.message("table '%s' does not exist" % self.options.db_table, "error")
-            cursor.close()
-            conn.close()
             exit(1)
 
         # process files
@@ -132,11 +136,16 @@ class XLSImporter(object):
                         # check if a row already exists
                         if self.options.keep_mode == columns[col_index]\
                         or self.options.update_mode == columns[col_index]:
-
                             query = "SELECT %s FROM %s WHERE %s = %%s" % (
                                 columns[col_index], self.options.db_table, columns[col_index])
                             self.message("%s" % (query % sheet.cell(row_index, col_index).value), "sql")
-                            cursor.execute(query, sheet.cell(row_index, col_index).value)
+
+                            try:
+                                cursor.execute(query, sheet.cell(row_index, col_index).value)
+                            except MySQLdb.Error, e:
+                                self.message("MySQL error (%d): %s" % (e.args[0], e.args[1]), "error")
+                                exit(1)
+
                             needs_update = sheet.cell(row_index, col_index).value if cursor.rowcount else False
 
                     query = ""
@@ -166,7 +175,11 @@ class XLSImporter(object):
                     if query:
                         self.message("%s" % (query % row), "sql")
                         if not self.options.test_mode:
-                            cursor.execute(query, row)
+                            try:
+                                cursor.execute(query, row)
+                            except MySQLdb.Error, e:
+                                self.message("MySQL error (%d): %s" % (e.args[0], e.args[1]), "error")
+                                exit(1)
 
         cursor.close()
         conn.commit()
