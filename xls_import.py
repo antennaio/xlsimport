@@ -62,18 +62,10 @@ class XLSImporter(object):
             else:
                 print "%s: %s" % (self.prog, m)
 
-    def valuePad(self, key):
+    def value_pad(self, key):
         return '%(' + str(key) + ')s'
 
-    def run(self):
-        self.message("connecting to database")
-        self.message("host: %s" % self.options.db_host)
-        self.message("user: %s" % self.options.db_user)
-        self.message("password: %s" % self.options.db_password)
-        self.message("database: %s" % self.options.db_database)
-        self.message("table: %s" % self.options.db_table)
-
-        # establish connection
+    def establish_connection(self):
         try:
             conn = MySQLdb.connect(host=self.options.db_host, user=self.options.db_user,
                 passwd=self.options.db_password, db=self.options.db_database)
@@ -84,7 +76,32 @@ class XLSImporter(object):
             self.message("cannot connect to database (%d): %s" % (e.args[0], e.args[1]), "error")
             exit(1)
 
-        cursor = conn.cursor()
+        return conn, conn.cursor()
+
+    def open_xls(self, file, index):
+        try:
+            xls = open_workbook(file)
+        except IOError:
+            self.message("no such file: %s" % file, "error")
+            exit(1)
+
+        try:
+            sheet = xls.sheet_by_index(int(index))
+        except IndexError:
+            self.message("sorry, this sheet is out of range: %s" % index, "error")
+            exit(1)
+
+        return sheet
+
+    def run(self):
+        self.message("connecting to database")
+        self.message("host: %s" % self.options.db_host)
+        self.message("user: %s" % self.options.db_user)
+        self.message("password: %s" % self.options.db_password)
+        self.message("database: %s" % self.options.db_database)
+        self.message("table: %s" % self.options.db_table)
+
+        conn, cursor = self.establish_connection()
 
         # check that a table exists
         query = "SHOW TABLES LIKE %s"
@@ -104,17 +121,7 @@ class XLSImporter(object):
         for file in self.args:
             self.message("opening: %s" % file)
 
-            try:
-                xls = open_workbook(file)
-            except IOError:
-                self.message("no such file: %s" % file, "error")
-                exit(1)
-
-            try:
-                sheet = xls.sheet_by_index(int(self.options.sheet))
-            except IndexError:
-                self.message("sorry, this sheet is out of range: %s" % int(self.options.sheet), "error")
-                exit(1)
+            sheet = self.open_xls(file, self.options.sheet)
 
             self.message("rows in sheet: %s" % sheet.nrows)
 
@@ -154,7 +161,7 @@ class XLSImporter(object):
                     # update row?
                     if self.options.update_mode and needs_update:
                         query = "UPDATE %s SET " % self.options.db_table
-                        query += ', '.join(["%s = %s" % (c[1], self.valuePad(c[1])) for c in enumerate(columns)])
+                        query += ', '.join(["%s = %s" % (c[1], self.value_pad(c[1])) for c in enumerate(columns)])
                         query += " WHERE %s = %%(searchstring)s" % self.options.update_mode
                         row['searchstring'] = needs_update
 
@@ -168,7 +175,7 @@ class XLSImporter(object):
                         query += ' ('
                         query += ', '.join(row)
                         query += ') VALUES ('
-                        query += ', '.join(map(self.valuePad, row))
+                        query += ', '.join(map(self.value_pad, row))
                         query += ')'
 
                     # execute query
