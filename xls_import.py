@@ -86,7 +86,7 @@ class XLSImporter(object):
             exit(1)
 
         try:
-            sheet = xls.sheet_by_index(int(index))
+            sheet = xls.sheet_by_index(index)
         except IndexError:
             self.message("sorry, this sheet is out of range: %s" % index, "error")
             exit(1)
@@ -121,7 +121,7 @@ class XLSImporter(object):
         for file in self.args:
             self.message("opening: %s" % file)
 
-            sheet = self.open_xls(file, self.options.sheet)
+            sheet = self.open_xls(file, int(self.options.sheet))
 
             self.message("rows in sheet: %s" % sheet.nrows)
 
