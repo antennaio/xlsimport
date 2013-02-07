@@ -78,6 +78,13 @@ class XLSImporter(object):
 
         return conn, conn.cursor()
 
+    def execute_query(self, query, params):
+        try:
+            self.cursor.execute(query, params)
+        except MySQLdb.Error, e:
+            self.message("MySQL error (%d): %s" % (e.args[0], e.args[1]), "error")
+            exit(1)
+
     def open_xls(self, file, index):
         try:
             xls = open_workbook(file)
@@ -101,19 +108,15 @@ class XLSImporter(object):
         self.message("database: %s" % self.options.db_database)
         self.message("table: %s" % self.options.db_table)
 
-        conn, cursor = self.establish_connection()
+        self.conn, self.cursor = self.establish_connection()
 
         # check that a table exists
         query = "SHOW TABLES LIKE %s"
         self.message("%s" % (query % self.options.db_table), "sql")
 
-        try:
-            cursor.execute(query, self.options.db_table)
-        except MySQLdb.Error, e:
-            self.message("MySQL error (%d): %s" % (e.args[0], e.args[1]), "error")
-            exit(1)
+        self.execute_query(query, self.options.db_table)
 
-        if not cursor.rowcount:
+        if not self.cursor.rowcount:
             self.message("table '%s' does not exist" % self.options.db_table, "error")
             exit(1)
 
@@ -147,13 +150,9 @@ class XLSImporter(object):
                                 columns[col_index], self.options.db_table, columns[col_index])
                             self.message("%s" % (query % sheet.cell(row_index, col_index).value), "sql")
 
-                            try:
-                                cursor.execute(query, sheet.cell(row_index, col_index).value)
-                            except MySQLdb.Error, e:
-                                self.message("MySQL error (%d): %s" % (e.args[0], e.args[1]), "error")
-                                exit(1)
+                            self.execute_query(query, sheet.cell(row_index, col_index).value)
 
-                            needs_update = sheet.cell(row_index, col_index).value if cursor.rowcount else False
+                            needs_update = sheet.cell(row_index, col_index).value if self.cursor.rowcount else False
 
                     query = ""
                     row = dict(zip(columns, values))
@@ -182,15 +181,11 @@ class XLSImporter(object):
                     if query:
                         self.message("%s" % (query % row), "sql")
                         if not self.options.test_mode:
-                            try:
-                                cursor.execute(query, row)
-                            except MySQLdb.Error, e:
-                                self.message("MySQL error (%d): %s" % (e.args[0], e.args[1]), "error")
-                                exit(1)
+                            self.execute_query(query, row)
 
-        cursor.close()
-        conn.commit()
-        conn.close()
+        self.cursor.close()
+        self.conn.commit()
+        self.conn.close()
 
         if not self.options.test_mode:
             self.message("success: data import completed")
