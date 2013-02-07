@@ -100,6 +100,69 @@ class XLSImporter(object):
 
         return sheet
 
+    def process_file(self, file):
+        self.message("opening: %s" % file)
+
+        sheet = self.open_xls(file, int(self.options.sheet))
+
+        self.message("rows in sheet: %s" % sheet.nrows)
+
+        columns = []
+        values = []
+
+        for row_index in range(sheet.nrows):
+            # store column names in a list
+            if row_index == 0:
+                for col_index in range(sheet.ncols):
+                    columns.append(sheet.cell(row_index, col_index).value)
+
+            # insert rows into MySQL database
+            else:
+                del values[:]
+                for col_index in range(sheet.ncols):
+                    values.append(sheet.cell(row_index, col_index).value)
+
+                    # check if a row already exists
+                    if self.options.keep_mode == columns[col_index]\
+                    or self.options.update_mode == columns[col_index]:
+                        query = "SELECT %s FROM %s WHERE %s = %%s" % (
+                            columns[col_index], self.options.db_table, columns[col_index])
+
+                        self.message("%s" % (query % sheet.cell(row_index, col_index).value), "sql")
+
+                        self.execute_query(query, sheet.cell(row_index, col_index).value)
+
+                        needs_update = sheet.cell(row_index, col_index).value if self.cursor.rowcount else False
+
+                query = ""
+                row = dict(zip(columns, values))
+
+                # update row?
+                if self.options.update_mode and needs_update:
+                    query = "UPDATE %s SET " % self.options.db_table
+                    query += ', '.join(["%s = %s" % (c[1], self.value_pad(c[1])) for c in enumerate(columns)])
+                    query += " WHERE %s = %%(searchstring)s" % self.options.update_mode
+                    row['searchstring'] = needs_update
+
+                # do nothing?
+                elif self.options.keep_mode and needs_update:
+                    self.message("keeping the row unchanged")
+
+                # insert row?
+                else:
+                    query = "INSERT INTO %s" % self.options.db_table
+                    query += ' ('
+                    query += ', '.join(row)
+                    query += ') VALUES ('
+                    query += ', '.join(map(self.value_pad, row))
+                    query += ')'
+
+                # execute query
+                if query:
+                    self.message("%s" % (query % row), "sql")
+                    if not self.options.test_mode:
+                        self.execute_query(query, row)
+
     def run(self):
         self.message("connecting to database")
         self.message("host: %s" % self.options.db_host)
@@ -112,6 +175,7 @@ class XLSImporter(object):
 
         # check that a table exists
         query = "SHOW TABLES LIKE %s"
+
         self.message("%s" % (query % self.options.db_table), "sql")
 
         self.execute_query(query, self.options.db_table)
@@ -121,67 +185,8 @@ class XLSImporter(object):
             exit(1)
 
         # process files
-        for file in self.args:
-            self.message("opening: %s" % file)
-
-            sheet = self.open_xls(file, int(self.options.sheet))
-
-            self.message("rows in sheet: %s" % sheet.nrows)
-
-            columns = []
-            values = []
-
-            for row_index in range(sheet.nrows):
-                # store column names in a list
-                if row_index == 0:
-                    for col_index in range(sheet.ncols):
-                        columns.append(sheet.cell(row_index, col_index).value)
-
-                # insert rows into MySQL database
-                else:
-                    del values[:]
-                    for col_index in range(sheet.ncols):
-                        values.append(sheet.cell(row_index, col_index).value)
-
-                        # check if a row already exists
-                        if self.options.keep_mode == columns[col_index]\
-                        or self.options.update_mode == columns[col_index]:
-                            query = "SELECT %s FROM %s WHERE %s = %%s" % (
-                                columns[col_index], self.options.db_table, columns[col_index])
-                            self.message("%s" % (query % sheet.cell(row_index, col_index).value), "sql")
-
-                            self.execute_query(query, sheet.cell(row_index, col_index).value)
-
-                            needs_update = sheet.cell(row_index, col_index).value if self.cursor.rowcount else False
-
-                    query = ""
-                    row = dict(zip(columns, values))
-
-                    # update row?
-                    if self.options.update_mode and needs_update:
-                        query = "UPDATE %s SET " % self.options.db_table
-                        query += ', '.join(["%s = %s" % (c[1], self.value_pad(c[1])) for c in enumerate(columns)])
-                        query += " WHERE %s = %%(searchstring)s" % self.options.update_mode
-                        row['searchstring'] = needs_update
-
-                    # do nothing?
-                    elif self.options.keep_mode and needs_update:
-                        self.message("keeping the row unchanged")
-
-                    # insert row?
-                    else:
-                        query = "INSERT INTO %s" % self.options.db_table
-                        query += ' ('
-                        query += ', '.join(row)
-                        query += ') VALUES ('
-                        query += ', '.join(map(self.value_pad, row))
-                        query += ')'
-
-                    # execute query
-                    if query:
-                        self.message("%s" % (query % row), "sql")
-                        if not self.options.test_mode:
-                            self.execute_query(query, row)
+        for f in self.args:
+            self.process_file(f)
 
         self.cursor.close()
         self.conn.commit()
