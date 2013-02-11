@@ -78,7 +78,7 @@ class XLSImporter(object):
 
         return conn, conn.cursor()
 
-    def execute_query(self, query, params):
+    def execute_query(self, query, params=None):
         try:
             self.cursor.execute(query, params)
         except MySQLdb.Error, e:
@@ -100,6 +100,13 @@ class XLSImporter(object):
 
         return sheet
 
+    query = {
+        'show': "SHOW TABLES LIKE '%(table)s'",
+        'select': "SELECT %(fields)s FROM %(table)s WHERE %(condition)s = %%s",
+        'update': "UPDATE %(table)s SET %(fields)s WHERE %(condition)s = %%(searchstring)s",
+        'insert': "INSERT INTO %(table)s (%(fields)s) VALUES (%(values)s)"
+    }
+
     def process_file(self, file):
         self.message("opening: %s" % file)
 
@@ -109,6 +116,8 @@ class XLSImporter(object):
 
         columns = []
         values = []
+
+        needs_update = False
 
         for row_index in range(sheet.nrows):
             # store column names in a list
@@ -123,15 +132,16 @@ class XLSImporter(object):
                     values.append(sheet.cell(row_index, col_index).value)
 
                     # check if a row already exists
-                    if self.options.keep_mode == columns[col_index]\
-                    or self.options.update_mode == columns[col_index]:
-                        query = "SELECT %s FROM %s WHERE %s = %%s" % (
-                            columns[col_index], self.options.db_table, columns[col_index])
+                    if self.options.keep_mode == columns[col_index] or self.options.update_mode == columns[col_index]:
 
-                        self.message("%s" % (query % sheet.cell(row_index, col_index).value), "sql")
+                        query = self.query['select'] % {
+                                'fields': columns[col_index],
+                                'table': self.options.db_table,
+                                'condition': columns[col_index]
+                            }
 
+                        self.message(query % sheet.cell(row_index, col_index).value, "sql")
                         self.execute_query(query, sheet.cell(row_index, col_index).value)
-
                         needs_update = sheet.cell(row_index, col_index).value if self.cursor.rowcount else False
 
                 query = ""
@@ -139,9 +149,13 @@ class XLSImporter(object):
 
                 # update row?
                 if self.options.update_mode and needs_update:
-                    query = "UPDATE %s SET " % self.options.db_table
-                    query += ', '.join(["%s = %s" % (c[1], self.value_pad(c[1])) for c in enumerate(columns)])
-                    query += " WHERE %s = %%(searchstring)s" % self.options.update_mode
+
+                    query = self.query['update'] % {
+                            'table': self.options.db_table,
+                            'fields': ', '.join(["%s = %s" % (c[1], self.value_pad(c[1])) for c in enumerate(columns)]),
+                            'condition': self.options.update_mode
+                        }
+
                     row['searchstring'] = needs_update
 
                 # do nothing?
@@ -150,16 +164,15 @@ class XLSImporter(object):
 
                 # insert row?
                 else:
-                    query = "INSERT INTO %s" % self.options.db_table
-                    query += ' ('
-                    query += ', '.join(row)
-                    query += ') VALUES ('
-                    query += ', '.join(map(self.value_pad, row))
-                    query += ')'
+                    query = self.query['insert'] % {
+                            'table': self.options.db_table,
+                            'fields': ', '.join(row),
+                            'values': ', '.join(map(self.value_pad, row))
+                        }
 
                 # execute query
                 if query:
-                    self.message("%s" % (query % row), "sql")
+                    self.message(query % row, "sql")
                     if not self.options.test_mode:
                         self.execute_query(query, row)
 
@@ -174,11 +187,13 @@ class XLSImporter(object):
         self.conn, self.cursor = self.establish_connection()
 
         # check that a table exists
-        query = "SHOW TABLES LIKE %s"
+        query = self.query['show'] % {
+                'table': self.options.db_table
+            }
 
-        self.message("%s" % (query % self.options.db_table), "sql")
+        self.message(query, "sql")
 
-        self.execute_query(query, self.options.db_table)
+        self.execute_query(query)
 
         if not self.cursor.rowcount:
             self.message("table '%s' does not exist" % self.options.db_table, "error")
