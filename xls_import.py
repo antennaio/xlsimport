@@ -100,6 +100,18 @@ class XLSImporter(object):
 
         return sheet
 
+    def check_table(self, table):
+        query = self.query['show'] % {
+                'table': table
+            }
+
+        self.message(query, "sql")
+        self.execute_query(query)
+
+        if not self.cursor.rowcount:
+            self.message("table '%s' does not exist" % table, "error")
+            exit(1)
+
     query = {
         'show': "SHOW TABLES LIKE '%(table)s'",
         'select': "SELECT %(fields)s FROM %(table)s WHERE %(condition)s = %%s",
@@ -186,18 +198,7 @@ class XLSImporter(object):
 
         self.conn, self.cursor = self.establish_connection()
 
-        # check that a table exists
-        query = self.query['show'] % {
-                'table': self.options.db_table
-            }
-
-        self.message(query, "sql")
-
-        self.execute_query(query)
-
-        if not self.cursor.rowcount:
-            self.message("table '%s' does not exist" % self.options.db_table, "error")
-            exit(1)
+        self.check_table(self.options.db_table)
 
         # process files
         for f in self.args:
