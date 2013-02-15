@@ -1,15 +1,15 @@
-xls_import.py
-=============
+xlsimport
+=========
 
-xls_import.py is a command line tool that imports data from XLS spreadsheets to MySQL.
+xlsimport is a command line tool that imports data from XLS spreadsheets to MySQL.
 
 What it does?
 -------------
 
 ```
-./xls_import.py --help
+./xlsimport --help
 
-Usage: xls_import.py [options] input files
+Usage: xlsimport [options] input files
 
 Options:
   --version             show program's version number and exit
@@ -38,26 +38,26 @@ How it works?
 -------------
 
 ```
-mysql --database=xls_import --user=root < test.sql
-./xls_import.py --db-host=localhost --db-user=root --db-password='' --db-database=xls_import --db-table=test test.xls
-xls_import.py: connecting to database
-xls_import.py: host: localhost
-xls_import.py: user: root
-xls_import.py: password: 
-xls_import.py: database: xls_import
-xls_import.py: table: test
-xls_import.py: sql: SHOW TABLES LIKE test
-xls_import.py: opening: test.xls
-xls_import.py: rows in sheet: 6
-xls_import.py: sql: INSERT INTO test (value_a, value_x, value_b) VALUES (blue, green, black)
-xls_import.py: sql: INSERT INTO test (value_a, value_x, value_b) VALUES (yellow, black, pink)
-xls_import.py: sql: INSERT INTO test (value_a, value_x, value_b) VALUES (violet, green, yellow)
-xls_import.py: sql: INSERT INTO test (value_a, value_x, value_b) VALUES (brown, blue, green)
-xls_import.py: sql: INSERT INTO test (value_a, value_x, value_b) VALUES (white, pink, blue)
-xls_import.py: success: data import completed
+mysql --database=xlsimport --user=root < test.sql
+./xlsimport --db-host=localhost --db-user=root --db-password='' --db-database=xlsimport --db-table=test test.xls
+xlsimport: connecting to database
+xlsimport: host: localhost
+xlsimport: user: root
+xlsimport: password: 
+xlsimport: database: xls_import
+xlsimport: table: test
+xlsimport: sql: SHOW TABLES LIKE test
+xlsimport: opening: test.xls
+xlsimport: rows in sheet: 6
+xlsimport: sql: INSERT INTO test (value_a, value_x, value_b) VALUES (blue, green, black)
+xlsimport: sql: INSERT INTO test (value_a, value_x, value_b) VALUES (yellow, black, pink)
+xlsimport: sql: INSERT INTO test (value_a, value_x, value_b) VALUES (violet, green, yellow)
+xlsimport: sql: INSERT INTO test (value_a, value_x, value_b) VALUES (brown, blue, green)
+xlsimport: sql: INSERT INTO test (value_a, value_x, value_b) VALUES (white, pink, blue)
+xlsimport: success: data import completed
 ```
 
 Dependencies
 ------------
 
-You will need [MySQLdb](http://pypi.python.org/pypi/MySQL-python) and [xlrd](http://pypi.python.org/pypi/xlrd) installed to use this tool.
+You will need Python 2.7, [MySQLdb](http://pypi.python.org/pypi/MySQL-python) and [xlrd](http://pypi.python.org/pypi/xlrd) installed to use this tool.
