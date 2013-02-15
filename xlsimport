@@ -161,6 +161,7 @@ class XLSImporter(object):
 
                 # update row?
                 if self.options.update_mode and needs_update:
+                    self.message("matching row found, updating row")
 
                     query = self.query['update'] % {
                             'table': self.options.db_table,
@@ -172,7 +173,7 @@ class XLSImporter(object):
 
                 # do nothing?
                 elif self.options.keep_mode and needs_update:
-                    self.message("keeping the row unchanged")
+                    self.message("matching row found, skipping row")
 
                 # insert row?
                 else:
